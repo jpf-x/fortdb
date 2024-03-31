@@ -381,7 +381,7 @@ contains
         integer(kind=WORD_SIZE) :: length
         dset%name=dset_name
         dset%description=get_dataset_description_from_data(dat)
-        length=get_1word_length_from_description(dset%description)
+        length=get_length_from_description(dset%description)
         select type (dat)
             type is (integer(kind=4))
                 allocate(dset%datas_i4(length))
