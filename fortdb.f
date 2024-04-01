@@ -16,7 +16,10 @@ module fortDB
 !    real*8 :: r8(4)
 !    i4=(/1,2,3,4,5,6,7,8,9,10,11,12/)
 !    r8=(/8.0d0,7.0d0,6.0d0,7.0d0/)
-!    dset1
+!    call init_fortdb
+!    call database1%initialize('file.bin')
+!    call database1%add('dataset1',i4)
+!    call database1%add('dataset2',r8)
 !
 ! index     value/desc
 !   1           1 integer*4
@@ -39,8 +42,9 @@ module fortDB
     integer,parameter :: WORD_SIZE=4
     integer,parameter :: DIMENSIONS=7
     integer,parameter :: DATASET_DESCRIPTION_LENGTH=3+DIMENSIONS
-    integer,parameter :: DATASET_NAME_LENGTH=8
+    integer,parameter :: DATASET_NAME_LENGTH=32
     integer,parameter :: MAX_PATH=256
+
     type,public :: dataset
 
         character(len=DATASET_NAME_LENGTH),public :: name
@@ -50,10 +54,10 @@ module fortDB
         integer(kind=8),allocatable :: datas_i8(:)
         real(kind=4),allocatable :: datas_r4(:)
         real(kind=8),allocatable :: datas_r8(:)
+        character(len=:),allocatable :: datas_c(:)
 
       contains
 
-        !procedure,public :: get      => get_data_from_dataset
         procedure,public :: get_size => get_dataset_size
         procedure,private :: allocator => allocator_dataset
         procedure,public :: get_shape => get_shape_from_description
@@ -64,7 +68,7 @@ module fortDB
     type,public :: database
 
         integer,private :: handle
-        integer,private :: number_of_datasets
+        integer,public :: number_of_datasets
         character(len=MAX_PATH) :: filename
         character(len=DATASET_NAME_LENGTH),allocatable,private :: dataset_names(:)
         integer,allocatable,private :: dataset_positions(:)
@@ -75,9 +79,7 @@ module fortDB
         procedure,public :: get_dataset_from_position
         procedure,public :: get_dataset_from_database
         generic,public :: get => get_dataset_from_database,get_dataset_from_position      ! get dataset from database
-!        procedure,public :: to_file   ! write database to specified file
         procedure,public :: add_dataset_to_database
-!        procedure,public :: add_data_to_database
         procedure,public :: add_dataset_at_position
         procedure,public :: add_dataset_from_data
         generic,public :: add => add_dataset_to_database, &
@@ -167,7 +169,6 @@ contains
         open(unit=handle,file=filename,status='old',access='stream',form='unformatted',action='read')
         read(handle,pos=1)dbase%number_of_datasets
         call dbase%allocator
-
         call dbase%get_dataset_information
         dbase%filename=filename
     end function from_file
@@ -281,11 +282,13 @@ contains
             case (1)
                 allocate(me%datas_i4(length))
             case (2)
-                allocate(me%datas_i8(length))
-            case (3)
                 allocate(me%datas_r4(length))
+            case (3)
+                allocate(me%datas_i8(length))
             case (4)
                 allocate(me%datas_r8(length))
+            case (5)
+                allocate(character(me%description(2)) :: me%datas_c(length))
         end select
     end subroutine allocator_dataset
 
@@ -335,11 +338,13 @@ contains
             case (1)
                 write(me%handle,pos=now_position)datset%datas_i4
             case (2)
-                write(me%handle,pos=now_position)datset%datas_i8
-            case (3)
                 write(me%handle,pos=now_position)datset%datas_r4
+            case (3)
+                write(me%handle,pos=now_position)datset%datas_i8
             case (4)
                 write(me%handle,pos=now_position)datset%datas_r8
+            case (5)
+                write(me%handle,pos=now_position)datset%datas_c
         end select
 
         close(me%handle)
@@ -364,37 +369,43 @@ contains
             case (1)
                 read(me%handle,pos=now_position) dset%datas_i4
             case (2)
-                read(me%handle,pos=now_position) dset%datas_i8
-            case (3)
                 read(me%handle,pos=now_position) dset%datas_r4
+            case (3)
+                read(me%handle,pos=now_position) dset%datas_i8
             case (4)
                 read(me%handle,pos=now_position) dset%datas_r8
+            case (5)
+                read(me%handle,pos=now_position) dset%datas_c
         end select
         close(me%handle)
     end function get_dataset_from_position
 
     function dataset_from_data(dset_name,dat) result(dset)
         implicit none
-        character(len=DATASET_NAME_LENGTH) :: dset_name
+        character(len=*) :: dset_name
         class(*) :: dat(:)
         type(dataset) :: dset
         integer(kind=WORD_SIZE) :: length
         dset%name=dset_name
+        dset%name=adjustr(dset%name)
         dset%description=get_dataset_description_from_data(dat)
         length=get_length_from_description(dset%description)
         select type (dat)
             type is (integer(kind=4))
                 allocate(dset%datas_i4(length))
                 dset%datas_i4=dat
-            type is (integer(kind=8))
-                allocate(dset%datas_i8(length))
-                dset%datas_i8=dat
             type is (real(kind=4))
                 allocate(dset%datas_r4(length))
                 dset%datas_r4=dat
+            type is (integer(kind=8))
+                allocate(dset%datas_i8(length))
+                dset%datas_i8=dat
             type is (real(kind=8))
                 allocate(dset%datas_r8(length))
                 dset%datas_r8=dat
+            type is (character(len=*))
+                allocate(character(dset%description(2)) :: dset%datas_c(length))
+                dset%datas_c=dat
         end select
 
     end function dataset_from_data
@@ -402,37 +413,12 @@ contains
     subroutine add_dataset_from_data(me,dset_name,dat)
         implicit none
         class(database) :: me
-        character(len=DATASET_NAME_LENGTH) :: dset_name
+        character(len=*) :: dset_name
         class(*) :: dat(:)
         type(dataset) :: dset
         dset=dataset_from_data(dset_name,dat)
         call me%add(dset)
     end subroutine add_dataset_from_data
-
-    function get_1word_length_from_description(description) result (s)
-        implicit none
-
-        integer(kind=WORD_SIZE),dimension(DATASET_DESCRIPTION_LENGTH) :: description
-        integer :: s
-        integer :: i
-        ! return 4-byte word length (dimension) from description
-        select case (description(1))
-            case (1)
-                s=1
-            case (2)
-                s=2
-            case (3)
-                s=1
-            case (4)
-                s=2
-            case (5)
-                s=description(2)
-        end select
-
-        do i=1,description(3)
-            s=s*description(3+i)
-        enddo
-    end function get_1word_length_from_description
 
     function get_length_from_description(description) result (s)
         implicit none
@@ -451,7 +437,7 @@ contains
             case (4)
                 s=1
             case (5)
-                s=description(2)
+                s=1
         end select
 
         do i=1,description(3)
@@ -467,15 +453,15 @@ contains
         select type (dat)
             type is (integer(kind=4))
                 description(1)=1
-            type is (integer(kind=8))
-                description(1)=2
             type is (real(kind=4))
+                description(1)=2
+            type is (integer(kind=8))
                 description(1)=3
             type is (real(kind=8))
                 description(1)=4
             type is (character(len=*))
                 description(1)=5
-                description(2)=size(dat)
+                description(2)=len(dat(1))
         end select
         description(3)=size(shape(dat))
         if (description(3).gt.0) then
@@ -492,14 +478,13 @@ contains
         integer :: i
         ifound=.false.
         do i=1,me%number_of_datasets
-            if (me%dataset_names(i).eq.dset_name) then
+            if (trim(adjustl(me%dataset_names(i))).eq.trim(dset_name)) then
                 ifound=.true.
                 exit
             endif
         enddo
         if (ifound) then
             dset=me%get_dataset_from_position(me%dataset_positions(i))
-            
         endif
 
     end function get_dataset_from_database
@@ -512,17 +497,18 @@ contains
         integer :: i
 
         ! total number of bytes of entry
-        if (me%description(1).eq.1) then
-            word_size=4
-        elseif (me%description(1).eq.2) then
-            word_size=4
-        elseif (me%description(1).eq.3) then
-            word_size=8
-        elseif (me%description(1).eq.4) then
-            word_size=8
-        elseif (me%description(1).eq.5) then
-            word_size=me%description(2)
-        endif
+        select case (me%description(1))
+            case (1)
+                word_size=4
+            case (2)
+                word_size=4
+            case (3)
+                word_size=8
+            case (4)
+                word_size=8
+            case (5)
+                word_size=me%description(2)
+        end select
         total_size=word_size
         do i=1,me%description(3)
             total_size=total_size*me%description(3+i)
