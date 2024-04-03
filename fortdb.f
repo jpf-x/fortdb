@@ -58,7 +58,7 @@ module fortDB
 
       contains
 
-        procedure,public :: get_size => get_dataset_size
+        procedure,public :: get_size => get_size_dataset
         procedure,private :: allocator => allocator_dataset
         procedure,public :: get_shape => get_shape_from_description
 
@@ -76,20 +76,26 @@ module fortDB
         integer,allocatable,private :: dataset_descriptions(:,:)
       contains
 
-        procedure,public :: get_dataset_from_position
-        procedure,public :: get_dataset_from_database
+        procedure,private :: get_dataset_from_position
+        procedure,private :: get_dataset_from_database
         generic,public :: get => get_dataset_from_database,get_dataset_from_position      ! get dataset from database
-        procedure,public :: add_dataset_to_database
-        procedure,public :: add_dataset_at_position
-        procedure,public :: add_dataset_from_data
+        procedure,private :: add_dataset_to_database
+        procedure,private :: add_dataset_at_position
+        procedure,private :: add_dataset_from_data
         generic,public :: add => add_dataset_to_database, &
      &                           add_dataset_from_data, &
      &                           add_dataset_at_position
-        procedure,public :: get_dataset_information
-        procedure,public :: initialize_database
-        procedure,public :: initialize_database_with_filename
+
+        procedure,public :: remove => remove_dataset_by_name
+        procedure,private :: get_dataset_information
+        procedure,public :: get_size => get_size_database
+        procedure,private :: initialize_database
+        procedure,private :: initialize_database_with_filename
         generic,public :: initialize => initialize_database,initialize_database_with_filename
-        procedure,public :: allocator => allocator_database
+        procedure,private :: allocator => allocator_database
+        procedure,private :: update_number_of_datasets
+        procedure,public :: close => close_database
+        procedure,public :: delete => delete_database
 
     end type database
 
@@ -144,6 +150,33 @@ contains
         me%filename=filename
     end subroutine initialize_database_with_filename
 
+    subroutine close_database(me)
+        implicit none
+        class(database) :: me
+        close(unit=me%handle)
+    end subroutine close_database
+
+    subroutine delete_database(me)
+        implicit none
+        class(database) :: me
+        close(unit=me%handle,status='delete')
+    end subroutine delete_database
+
+    function get_size_database(me) result (total_size_bytes)
+        implicit none
+        class(database) :: me
+        integer*8 :: total_size_bytes
+        integer :: i
+
+        total_size_bytes=WORD_SIZE ! 4-byte number of datasets
+        do i=1,me%number_of_datasets
+            total_size_bytes=total_size_bytes+DATASET_NAME_LENGTH+ &
+     &                       DATASET_DESCRIPTION_LENGTH*WORD_SIZE+ &
+     &                       me%dataset_sizes(i)
+        enddo
+        
+    end function get_size_database
+
     function get_shape_from_description(me) result (s)
         implicit none
         class(dataset) :: me
@@ -180,7 +213,7 @@ contains
         integer(kind=4),dimension(DATASET_DESCRIPTION_LENGTH) :: dataset_description
         integer :: i
 
-        now_position=1+4
+        now_position=1+WORD_SIZE
         do i=1,me%number_of_datasets
             me%dataset_positions(i)=now_position
             read(me%handle,pos=now_position)me%dataset_names(i)
@@ -237,13 +270,13 @@ contains
                 if (.not.allocated(me%dataset_names)) allocate(me%dataset_names(num_dsets))
                 if (.not.allocated(me%dataset_descriptions)) allocate(me%dataset_descriptions(DATASET_DESCRIPTION_LENGTH,num_dsets))
                 if (.not.allocated(me%dataset_sizes)) allocate(me%dataset_sizes(num_dsets))
-            elseif (size(me%dataset_positions).lt.num_dsets) then ! resize arrays
+            elseif (size(me%dataset_positions).ne.num_dsets) then ! resize arrays
                 old_length=size(me%dataset_positions)
                 allocate(dataset_positions(num_dsets))
                 allocate(dataset_names(num_dsets))
                 allocate(dataset_descriptions(DATASET_DESCRIPTION_LENGTH,num_dsets))
                 allocate(dataset_sizes(num_dsets))
-                do i=1,old_length
+                do i=1,min(old_length,num_dsets)
                     dataset_positions(i)=me%dataset_positions(i)
                     dataset_names(i)=me%dataset_names(i)
                     dataset_descriptions(:,i)=me%dataset_descriptions(:,i)
@@ -257,7 +290,7 @@ contains
                 allocate(me%dataset_names(num_dsets))
                 allocate(me%dataset_descriptions(DATASET_DESCRIPTION_LENGTH,num_dsets))
                 allocate(me%dataset_sizes(num_dsets))
-                do i=1,old_length
+                do i=1,min(old_length,num_dsets)
                     me%dataset_positions(i)=dataset_positions(i)
                     me%dataset_names(i)=dataset_names(i)
                     me%dataset_descriptions(:,i)=dataset_descriptions(:,i)
@@ -300,9 +333,9 @@ contains
         integer :: dset_size
         
         me%number_of_datasets=me%number_of_datasets+1
-        open(unit=me%handle,file=me%filename,access='stream',form='unformatted',action='write')
-        write(me%handle,pos=1)me%number_of_datasets ! update number of datasets
-        close(me%handle)
+
+        call me%update_number_of_datasets
+
         call me%allocator
 
         if (me%number_of_datasets.eq.1) then
@@ -328,7 +361,7 @@ contains
         class(dataset) :: datset
         integer :: posit
         integer :: now_position
-        open(unit=me%handle,file=me%filename,access='stream',form='unformatted',action='write')
+        open(unit=me%handle,file=me%filename,access='stream',status='unknown',form='unformatted',action='write')
         now_position=posit
         write(me%handle,pos=now_position)datset%name
         now_position=now_position+DATASET_NAME_LENGTH
@@ -351,6 +384,63 @@ contains
 
     end subroutine add_dataset_at_position
 
+    subroutine remove_dataset_by_name(me,dset_name)
+        implicit none
+        class(database) :: me
+        type(dataset) :: dats ! for temporary storage of moved dataset
+        character(len=*) :: dset_name
+
+        logical :: ifound
+        integer :: i
+        integer :: j
+        integer :: posir
+        integer :: posit
+        byte,allocatable :: alldata(:)
+        integer*8 :: total_size
+        
+        ifound=.false.
+        do i=1,me%number_of_datasets
+            if (trim(adjustl(me%dataset_names(i))).eq.trim(dset_name)) then
+                ifound=.true.
+                exit
+            endif
+        enddo
+        if (ifound) then
+            posir=me%dataset_positions(i)
+            total_size=me%get_size()
+            do j=i+1,me%number_of_datasets
+                posit=me%dataset_positions(j)
+                dats=me%get_dataset_from_position(posit)
+                call me%add_dataset_at_position(dats,posir)
+                posir=posit+DATASET_NAME_LENGTH+DATASET_DESCRIPTION_LENGTH*WORD_SIZE+me%dataset_sizes(j)
+                me%dataset_sizes(j-1)=me%dataset_sizes(j) ! used in get_size below
+                me%dataset_positions(j-1)=me%dataset_positions(j)
+            enddo
+            me%number_of_datasets=me%number_of_datasets-1
+            call me%allocator
+            total_size=me%get_size() ! total size of database in bytes
+            allocate(alldata(total_size))
+
+            call me%update_number_of_datasets
+
+            open(unit=me%handle,file=me%filename,form='unformatted',access='stream',status='old',action='read')
+            read(unit=me%handle,pos=1)alldata
+            call me%delete
+            open(unit=me%handle,file=me%filename,form='unformatted',access='stream',status='new',action='write')
+            write(me%handle)alldata
+            deallocate(alldata)
+        endif
+
+    end subroutine remove_dataset_by_name
+
+    subroutine update_number_of_datasets(me)
+        implicit none
+        class(database) :: me
+        open(unit=me%handle,file=me%filename,access='stream',status='unknown',form='unformatted',action='write')
+        write(me%handle,pos=1)me%number_of_datasets ! update number of datasets
+        call me%close
+    end subroutine update_number_of_datasets
+
     function get_dataset_from_position(me,posit) result (dset)
         implicit none
         class(database) :: me
@@ -358,7 +448,7 @@ contains
         integer :: posit
         integer :: now_position
         integer :: length
-        open(unit=me%handle,file=me%filename,access='stream',form='unformatted',action='read')
+        open(unit=me%handle,file=me%filename,access='stream',status='old',form='unformatted',action='read')
         now_position=posit
         read(me%handle,pos=now_position) dset%name
         now_position=now_position+DATASET_NAME_LENGTH
@@ -449,6 +539,7 @@ contains
         implicit none
         class(*) :: dat(:)
         integer(kind=WORD_SIZE),dimension(DATASET_DESCRIPTION_LENGTH) :: description
+        integer :: i
         description=0
         select type (dat)
             type is (integer(kind=4))
@@ -462,6 +553,9 @@ contains
             type is (character(len=*))
                 description(1)=5
                 description(2)=len(dat(1))
+                do i=2,size(dat)
+                    description(2)=max(description(2),len(dat(i)))
+                enddo
         end select
         description(3)=size(shape(dat))
         if (description(3).gt.0) then
@@ -489,7 +583,7 @@ contains
 
     end function get_dataset_from_database
 
-    function get_dataset_size(me) result (total_size)
+    function get_size_dataset(me) result (total_size)
         implicit none
         class(dataset) :: me
         integer :: word_size
@@ -513,7 +607,7 @@ contains
         do i=1,me%description(3)
             total_size=total_size*me%description(3+i)
         enddo
-    end function get_dataset_size
+    end function get_size_dataset
 
 
 
