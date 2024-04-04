@@ -40,7 +40,7 @@ module fortDB
 
     integer,parameter :: kind4=4
     integer,parameter :: WORD_SIZE=4
-    integer,parameter :: DIMENSIONS=7
+    integer,parameter :: DIMENSIONS=7   ! in order to change (increase) this, _1d, _2d, etc functions must be replicated as appropriate to beyond _7d
     integer,parameter :: DATASET_DESCRIPTION_LENGTH=3+DIMENSIONS
     integer,parameter :: DATASET_NAME_LENGTH=32
     integer,parameter :: MAX_PATH=256
@@ -64,6 +64,25 @@ module fortDB
 
     end type dataset
 
+    interface dataset_from_data
+        procedure :: dataset_from_data_1d
+        procedure :: dataset_from_data_2d
+        procedure :: dataset_from_data_3d
+        procedure :: dataset_from_data_4d
+        procedure :: dataset_from_data_5d
+        procedure :: dataset_from_data_6d
+        procedure :: dataset_from_data_7d
+    end interface dataset_from_data
+
+    interface get_dataset_description_from_data
+        procedure :: get_dataset_description_from_data_1d
+        procedure :: get_dataset_description_from_data_2d
+        procedure :: get_dataset_description_from_data_3d
+        procedure :: get_dataset_description_from_data_4d
+        procedure :: get_dataset_description_from_data_5d
+        procedure :: get_dataset_description_from_data_6d
+        procedure :: get_dataset_description_from_data_7d
+    end interface get_dataset_description_from_data
 
     type,public :: database
 
@@ -78,12 +97,25 @@ module fortDB
 
         procedure,private :: get_dataset_from_position
         procedure,private :: get_dataset_from_database
-        generic,public :: get => get_dataset_from_database,get_dataset_from_position      ! get dataset from database
+        generic,public :: get => get_dataset_from_database, &
+     &                           get_dataset_from_position
         procedure,private :: add_dataset_to_database
         procedure,private :: add_dataset_at_position
-        procedure,private :: add_dataset_from_data
+        procedure,private :: add_dataset_from_data_1d
+        procedure,private :: add_dataset_from_data_2d
+        procedure,private :: add_dataset_from_data_3d
+        procedure,private :: add_dataset_from_data_4d
+        procedure,private :: add_dataset_from_data_5d
+        procedure,private :: add_dataset_from_data_6d
+        procedure,private :: add_dataset_from_data_7d
         generic,public :: add => add_dataset_to_database, &
-     &                           add_dataset_from_data, &
+     &                           add_dataset_from_data_1d, &
+     &                           add_dataset_from_data_2d, &
+     &                           add_dataset_from_data_3d, &
+     &                           add_dataset_from_data_4d, &
+     &                           add_dataset_from_data_5d, &
+     &                           add_dataset_from_data_6d, &
+     &                           add_dataset_from_data_7d, &
      &                           add_dataset_at_position
 
         procedure,public :: remove => remove_dataset_by_name
@@ -470,16 +502,121 @@ contains
         close(me%handle)
     end function get_dataset_from_position
 
-    function dataset_from_data(dset_name,dat) result(dset)
+    function dataset_from_data_1d(dset_name,dat) result(dset)
         implicit none
         character(len=*) :: dset_name
-        class(*) :: dat(:)
+        class(*),target :: dat(:)
         type(dataset) :: dset
         integer(kind=WORD_SIZE) :: length
+        class(*),pointer :: arr(:) 
+        arr(1:size(dat))=>dat
         dset%name=dset_name
         dset%name=adjustr(dset%name)
         dset%description=get_dataset_description_from_data(dat)
         length=get_length_from_description(dset%description)
+        call set_to_1d(dset,arr,size(dat))
+    end function dataset_from_data_1d
+
+    function dataset_from_data_2d(dset_name,dat) result(dset)
+        implicit none
+        character(len=*) :: dset_name
+        class(*),target :: dat(:,:)
+        type(dataset) :: dset
+        integer(kind=WORD_SIZE) :: length
+        class(*),pointer :: arr(:) 
+        arr(1:size(dat))=>dat
+        dset%name=dset_name
+        dset%name=adjustr(dset%name)
+        dset%description=get_dataset_description_from_data(dat)
+        length=get_length_from_description(dset%description)
+        call set_to_1d(dset,arr,size(dat))
+
+    end function dataset_from_data_2d
+
+    function dataset_from_data_3d(dset_name,dat) result(dset)
+        implicit none
+        character(len=*) :: dset_name
+        class(*),target :: dat(:,:,:)
+        type(dataset) :: dset
+        integer(kind=WORD_SIZE) :: length
+        class(*),pointer :: arr(:) 
+        arr(1:size(dat))=>dat
+        dset%name=dset_name
+        dset%name=adjustr(dset%name)
+        dset%description=get_dataset_description_from_data(dat)
+        length=get_length_from_description(dset%description)
+        call set_to_1d(dset,arr,size(dat))
+
+    end function dataset_from_data_3d
+
+    function dataset_from_data_4d(dset_name,dat) result(dset)
+        implicit none
+        character(len=*) :: dset_name
+        class(*),target :: dat(:,:,:,:)
+        type(dataset) :: dset
+        integer(kind=WORD_SIZE) :: length
+        class(*),pointer :: arr(:) 
+        arr(1:size(dat))=>dat
+        dset%name=dset_name
+        dset%name=adjustr(dset%name)
+        dset%description=get_dataset_description_from_data(dat)
+        length=get_length_from_description(dset%description)
+        call set_to_1d(dset,arr,size(dat))
+
+    end function dataset_from_data_4d
+
+    function dataset_from_data_5d(dset_name,dat) result(dset)
+        implicit none
+        character(len=*) :: dset_name
+        class(*),target :: dat(:,:,:,:,:)
+        type(dataset) :: dset
+        integer(kind=WORD_SIZE) :: length
+        class(*),pointer :: arr(:) 
+        arr(1:size(dat))=>dat
+        dset%name=dset_name
+        dset%name=adjustr(dset%name)
+        dset%description=get_dataset_description_from_data(dat)
+        length=get_length_from_description(dset%description)
+        call set_to_1d(dset,arr,size(dat))
+
+    end function dataset_from_data_5d
+
+    function dataset_from_data_6d(dset_name,dat) result(dset)
+        implicit none
+        character(len=*) :: dset_name
+        class(*),target :: dat(:,:,:,:,:,:)
+        type(dataset) :: dset
+        integer(kind=WORD_SIZE) :: length
+        class(*),pointer :: arr(:) 
+        arr(1:size(dat))=>dat
+        dset%name=dset_name
+        dset%name=adjustr(dset%name)
+        dset%description=get_dataset_description_from_data(dat)
+        length=get_length_from_description(dset%description)
+        call set_to_1d(dset,arr,size(dat))
+
+    end function dataset_from_data_6d
+
+    function dataset_from_data_7d(dset_name,dat) result(dset)
+        implicit none
+        character(len=*) :: dset_name
+        class(*),target :: dat(:,:,:,:,:,:,:)
+        type(dataset) :: dset
+        integer(kind=WORD_SIZE) :: length
+        class(*),pointer :: arr(:) 
+        arr(1:size(dat))=>dat
+        dset%name=dset_name
+        dset%name=adjustr(dset%name)
+        dset%description=get_dataset_description_from_data(dat)
+        length=get_length_from_description(dset%description)
+        call set_to_1d(dset,arr,size(dat))
+
+    end function dataset_from_data_7d
+
+    subroutine set_to_1d(dset,dat,length)
+        class(*) :: dat(length)
+        class(dataset) :: dset
+        integer :: length
         select type (dat)
             type is (integer(kind=4))
                 allocate(dset%datas_i4(length))
@@ -497,10 +634,9 @@ contains
                 allocate(character(dset%description(2)) :: dset%datas_c(length))
                 dset%datas_c=dat
         end select
+    end subroutine set_to_1d
 
-    end function dataset_from_data
-
-    subroutine add_dataset_from_data(me,dset_name,dat)
+    subroutine add_dataset_from_data_1d(me,dset_name,dat)
         implicit none
         class(database) :: me
         character(len=*) :: dset_name
@@ -508,7 +644,67 @@ contains
         type(dataset) :: dset
         dset=dataset_from_data(dset_name,dat)
         call me%add(dset)
-    end subroutine add_dataset_from_data
+    end subroutine add_dataset_from_data_1d
+
+    subroutine add_dataset_from_data_2d(me,dset_name,dat)
+        implicit none
+        class(database) :: me
+        character(len=*) :: dset_name
+        class(*) :: dat(:,:)
+        type(dataset) :: dset
+        dset=dataset_from_data(dset_name,dat)
+        call me%add(dset)
+    end subroutine add_dataset_from_data_2d
+
+    subroutine add_dataset_from_data_3d(me,dset_name,dat)
+        implicit none
+        class(database) :: me
+        character(len=*) :: dset_name
+        class(*) :: dat(:,:,:)
+        type(dataset) :: dset
+        dset=dataset_from_data(dset_name,dat)
+        call me%add(dset)
+    end subroutine add_dataset_from_data_3d
+
+    subroutine add_dataset_from_data_4d(me,dset_name,dat)
+        implicit none
+        class(database) :: me
+        character(len=*) :: dset_name
+        class(*) :: dat(:,:,:,:)
+        type(dataset) :: dset
+        dset=dataset_from_data(dset_name,dat)
+        call me%add(dset)
+    end subroutine add_dataset_from_data_4d
+
+    subroutine add_dataset_from_data_5d(me,dset_name,dat)
+        implicit none
+        class(database) :: me
+        character(len=*) :: dset_name
+        class(*) :: dat(:,:,:,:,:)
+        type(dataset) :: dset
+        dset=dataset_from_data(dset_name,dat)
+        call me%add(dset)
+    end subroutine add_dataset_from_data_5d
+
+    subroutine add_dataset_from_data_6d(me,dset_name,dat)
+        implicit none
+        class(database) :: me
+        character(len=*) :: dset_name
+        class(*) :: dat(:,:,:,:,:,:)
+        type(dataset) :: dset
+        dset=dataset_from_data(dset_name,dat)
+        call me%add(dset)
+    end subroutine add_dataset_from_data_6d
+
+    subroutine add_dataset_from_data_7d(me,dset_name,dat)
+        implicit none
+        class(database) :: me
+        character(len=*) :: dset_name
+        class(*) :: dat(:,:,:,:,:,:,:)
+        type(dataset) :: dset
+        dset=dataset_from_data(dset_name,dat)
+        call me%add(dset)
+    end subroutine add_dataset_from_data_7d
 
     function get_length_from_description(description) result (s)
         implicit none
@@ -535,7 +731,7 @@ contains
         enddo
     end function get_length_from_description
 
-    function get_dataset_description_from_data(dat) result (description)
+    function get_dataset_description_from_data_1d(dat) result (description)
         implicit none
         class(*) :: dat(:)
         integer(kind=WORD_SIZE),dimension(DATASET_DESCRIPTION_LENGTH) :: description
@@ -561,7 +757,234 @@ contains
         if (description(3).gt.0) then
             description(4:4+description(3)-1)=shape(dat)
         endif
-    end function get_dataset_description_from_data
+    end function get_dataset_description_from_data_1d
+
+    function get_dataset_description_from_data_2d(dat) result (description)
+        implicit none
+        class(*) :: dat(:,:)
+        integer(kind=WORD_SIZE),dimension(DATASET_DESCRIPTION_LENGTH) :: description
+        integer :: i,j
+        integer :: shap(2)
+        description=0
+        select type (dat)
+            type is (integer(kind=4))
+                description(1)=1
+            type is (real(kind=4))
+                description(1)=2
+            type is (integer(kind=8))
+                description(1)=3
+            type is (real(kind=8))
+                description(1)=4
+            type is (character(len=*))
+                description(1)=5
+                description(2)=len(dat(1,1))
+                shap=shape(dat)
+                do j=1,shap(2)
+                do i=2,size(dat)
+                    description(2)=max(description(2),len(dat(i,j)))
+                enddo
+                enddo
+        end select
+        description(3)=size(shape(dat))
+        if (description(3).gt.0) then
+            description(4:4+description(3)-1)=shape(dat)
+        endif
+    end function get_dataset_description_from_data_2d
+
+    function get_dataset_description_from_data_3d(dat) result (description)
+        implicit none
+        class(*) :: dat(:,:,:)
+        integer(kind=WORD_SIZE),dimension(DATASET_DESCRIPTION_LENGTH) :: description
+        integer :: i,j,k
+        integer :: shap(3)
+        
+        description=0
+        select type (dat)
+            type is (integer(kind=4))
+                description(1)=1
+            type is (real(kind=4))
+                description(1)=2
+            type is (integer(kind=8))
+                description(1)=3
+            type is (real(kind=8))
+                description(1)=4
+            type is (character(len=*))
+                description(1)=5
+                description(2)=len(dat(1,1,1))
+                shap=shape(dat)
+                do k=1,shap(3)
+                do j=1,shap(2)
+                do i=2,shap(1)
+                    description(2)=max(description(2),len(dat(i,j,k)))
+                enddo
+                enddo
+                enddo
+        end select
+        description(3)=size(shape(dat))
+        if (description(3).gt.0) then
+            description(4:4+description(3)-1)=shape(dat)
+        endif
+    end function get_dataset_description_from_data_3d
+
+    function get_dataset_description_from_data_4d(dat) result (description)
+        implicit none
+        class(*) :: dat(:,:,:,:)
+        integer(kind=WORD_SIZE),dimension(DATASET_DESCRIPTION_LENGTH) :: description
+        integer :: i,j,k,l
+        integer :: shap(4)
+        
+        description=0
+        select type (dat)
+            type is (integer(kind=4))
+                description(1)=1
+            type is (real(kind=4))
+                description(1)=2
+            type is (integer(kind=8))
+                description(1)=3
+            type is (real(kind=8))
+                description(1)=4
+            type is (character(len=*))
+                description(1)=5
+                description(2)=len(dat(1,1,1,1))
+                shap=shape(dat)
+                do l=1,shap(4)
+                do k=1,shap(3)
+                do j=1,shap(2)
+                do i=2,shap(1)
+                    description(2)=max(description(2),len(dat(i,j,k,l)))
+                enddo
+                enddo
+                enddo
+                enddo
+        end select
+        description(3)=size(shape(dat))
+        if (description(3).gt.0) then
+            description(4:4+description(3)-1)=shape(dat)
+        endif
+    end function get_dataset_description_from_data_4d
+
+    function get_dataset_description_from_data_5d(dat) result (description)
+        implicit none
+        class(*) :: dat(:,:,:,:,:)
+        integer(kind=WORD_SIZE),dimension(DATASET_DESCRIPTION_LENGTH) :: description
+        integer :: i,j,k,l,m
+        integer :: shap(5)
+        
+        description=0
+        select type (dat)
+            type is (integer(kind=4))
+                description(1)=1
+            type is (real(kind=4))
+                description(1)=2
+            type is (integer(kind=8))
+                description(1)=3
+            type is (real(kind=8))
+                description(1)=4
+            type is (character(len=*))
+                description(1)=5
+                description(2)=len(dat(1,1,1,1,1))
+                shap=shape(dat)
+                do m=1,shap(5)
+                do l=1,shap(4)
+                do k=1,shap(3)
+                do j=1,shap(2)
+                do i=2,shap(1)
+                    description(2)=max(description(2),len(dat(i,j,k,l,m)))
+                enddo
+                enddo
+                enddo
+                enddo
+                enddo
+        end select
+        description(3)=size(shape(dat))
+        if (description(3).gt.0) then
+            description(4:4+description(3)-1)=shape(dat)
+        endif
+    end function get_dataset_description_from_data_5d
+
+    function get_dataset_description_from_data_6d(dat) result (description)
+        implicit none
+        class(*) :: dat(:,:,:,:,:,:)
+        integer(kind=WORD_SIZE),dimension(DATASET_DESCRIPTION_LENGTH) :: description
+        integer :: i,j,k,l,m,n
+        integer :: shap(6)
+        
+        description=0
+        select type (dat)
+            type is (integer(kind=4))
+                description(1)=1
+            type is (real(kind=4))
+                description(1)=2
+            type is (integer(kind=8))
+                description(1)=3
+            type is (real(kind=8))
+                description(1)=4
+            type is (character(len=*))
+                description(1)=5
+                description(2)=len(dat(1,1,1,1,1,1))
+                shap=shape(dat)
+                do n=1,shap(6)
+                do m=1,shap(5)
+                do l=1,shap(4)
+                do k=1,shap(3)
+                do j=1,shap(2)
+                do i=2,shap(1)
+                    description(2)=max(description(2),len(dat(i,j,k,l,m,n)))
+                enddo
+                enddo
+                enddo
+                enddo
+                enddo
+                enddo
+        end select
+        description(3)=size(shape(dat))
+        if (description(3).gt.0) then
+            description(4:4+description(3)-1)=shape(dat)
+        endif
+    end function get_dataset_description_from_data_6d
+
+    function get_dataset_description_from_data_7d(dat) result (description)
+        implicit none
+        class(*) :: dat(:,:,:,:,:,:,:)
+        integer(kind=WORD_SIZE),dimension(DATASET_DESCRIPTION_LENGTH) :: description
+        integer :: i,j,k,l,m,n,o
+        integer :: shap(7)
+        
+        description=0
+        select type (dat)
+            type is (integer(kind=4))
+                description(1)=1
+            type is (real(kind=4))
+                description(1)=2
+            type is (integer(kind=8))
+                description(1)=3
+            type is (real(kind=8))
+                description(1)=4
+            type is (character(len=*))
+                description(1)=5
+                description(2)=len(dat(1,1,1,1,1,1,1))
+                shap=shape(dat)
+                do o=1,shap(7)
+                do n=1,shap(6)
+                do m=1,shap(5)
+                do l=1,shap(4)
+                do k=1,shap(3)
+                do j=1,shap(2)
+                do i=2,shap(1)
+                    description(2)=max(description(2),len(dat(i,j,k,l,m,n,o)))
+                enddo
+                enddo
+                enddo
+                enddo
+                enddo
+                enddo
+                enddo
+        end select
+        description(3)=size(shape(dat))
+        if (description(3).gt.0) then
+            description(4:4+description(3)-1)=shape(dat)
+        endif
+    end function get_dataset_description_from_data_7d
 
     function get_dataset_from_database(me,dset_name) result (dset)
         implicit none
