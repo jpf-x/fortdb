@@ -65,6 +65,7 @@ module fortDB
     end type dataset
 
     interface dataset_from_data
+        procedure :: dataset_from_data_0d
         procedure :: dataset_from_data_1d
         procedure :: dataset_from_data_2d
         procedure :: dataset_from_data_3d
@@ -75,6 +76,7 @@ module fortDB
     end interface dataset_from_data
 
     interface get_dataset_description_from_data
+        procedure :: get_dataset_description_from_data_0d
         procedure :: get_dataset_description_from_data_1d
         procedure :: get_dataset_description_from_data_2d
         procedure :: get_dataset_description_from_data_3d
@@ -83,6 +85,11 @@ module fortDB
         procedure :: get_dataset_description_from_data_6d
         procedure :: get_dataset_description_from_data_7d
     end interface get_dataset_description_from_data
+
+    interface set_to_1d
+        procedure :: set_to_1d_0d
+        procedure :: set_to_1d_nd
+    end interface set_to_1d
 
     type,public :: database
 
@@ -101,6 +108,7 @@ module fortDB
      &                           get_dataset_from_position
         procedure,private :: add_dataset_to_database
         procedure,private :: add_dataset_at_position
+        procedure,private :: add_dataset_from_data_0d
         procedure,private :: add_dataset_from_data_1d
         procedure,private :: add_dataset_from_data_2d
         procedure,private :: add_dataset_from_data_3d
@@ -109,6 +117,7 @@ module fortDB
         procedure,private :: add_dataset_from_data_6d
         procedure,private :: add_dataset_from_data_7d
         generic,public :: add => add_dataset_to_database, &
+     &                           add_dataset_from_data_0d, &
      &                           add_dataset_from_data_1d, &
      &                           add_dataset_from_data_2d, &
      &                           add_dataset_from_data_3d, &
@@ -502,6 +511,19 @@ contains
         close(me%handle)
     end function get_dataset_from_position
 
+    function dataset_from_data_0d(dset_name,dat) result(dset)
+        implicit none
+        character(len=*) :: dset_name
+        class(*) :: dat
+        type(dataset) :: dset
+        integer(kind=WORD_SIZE) :: length
+        dset%name=dset_name
+        dset%name=adjustr(dset%name)
+        dset%description=get_dataset_description_from_data(dat)
+        length=get_length_from_description(dset%description)
+        call set_to_1d(dset,dat)
+    end function dataset_from_data_0d
+
     function dataset_from_data_1d(dset_name,dat) result(dset)
         implicit none
         character(len=*) :: dset_name
@@ -613,7 +635,31 @@ contains
 
     end function dataset_from_data_7d
 
-    subroutine set_to_1d(dset,dat,length)
+    subroutine set_to_1d_0d(dset,dat)
+        class(*) :: dat
+        class(dataset) :: dset
+        integer :: length
+        length=1
+        select type (dat)
+            type is (integer(kind=4))
+                allocate(dset%datas_i4(length))
+                dset%datas_i4=dat
+            type is (real(kind=4))
+                allocate(dset%datas_r4(length))
+                dset%datas_r4=dat
+            type is (integer(kind=8))
+                allocate(dset%datas_i8(length))
+                dset%datas_i8=dat
+            type is (real(kind=8))
+                allocate(dset%datas_r8(length))
+                dset%datas_r8=dat
+            type is (character(len=*))
+                allocate(character(dset%description(2)) :: dset%datas_c(length))
+                dset%datas_c=dat
+        end select
+    end subroutine set_to_1d_0d
+
+    subroutine set_to_1d_nd(dset,dat,length)
         class(*) :: dat(length)
         class(dataset) :: dset
         integer :: length
@@ -634,7 +680,17 @@ contains
                 allocate(character(dset%description(2)) :: dset%datas_c(length))
                 dset%datas_c=dat
         end select
-    end subroutine set_to_1d
+    end subroutine set_to_1d_nd
+
+    subroutine add_dataset_from_data_0d(me,dset_name,dat)
+        implicit none
+        class(database) :: me
+        character(len=*) :: dset_name
+        class(*) :: dat
+        type(dataset) :: dset
+        dset=dataset_from_data(dset_name,dat)
+        call me%add(dset)
+    end subroutine add_dataset_from_data_0d
 
     subroutine add_dataset_from_data_1d(me,dset_name,dat)
         implicit none
@@ -730,6 +786,27 @@ contains
             s=s*description(3+i)
         enddo
     end function get_length_from_description
+
+    function get_dataset_description_from_data_0d(dat) result (description)
+        implicit none
+        class(*) :: dat
+        integer(kind=WORD_SIZE),dimension(DATASET_DESCRIPTION_LENGTH) :: description
+        integer :: i
+        description=0
+        select type (dat)
+            type is (integer(kind=4))
+                description(1)=1
+            type is (real(kind=4))
+                description(1)=2
+            type is (integer(kind=8))
+                description(1)=3
+            type is (real(kind=8))
+                description(1)=4
+            type is (character(len=*))
+                description(1)=5
+                description(2)=len(dat)
+        end select
+    end function get_dataset_description_from_data_0d
 
     function get_dataset_description_from_data_1d(dat) result (description)
         implicit none
