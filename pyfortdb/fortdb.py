@@ -5,6 +5,7 @@ from pathlib import Path
 import struct
 from numpy import array,ndarray,int32,float32,float64,int64,dtype
 from math import prod
+from collections import defaultdict
 
 DATASET_NAME_LENGTH=32
 DATASET_MAX_DIMENSION=7
@@ -82,8 +83,8 @@ ASBYTES={
 class File:
     def __init__(self,file,order='F',mode='r'):
         self._file=Path(file)
+        self._dataset_info=defaultdict(dict)
         self._dataset_names=[]
-        self._datasets={}
         self._mode=mode
         self._init_database(order=order)
         self._order=order
@@ -98,15 +99,24 @@ class File:
             return
         with self._file.open('rb') as fobj:
             self._number_of_datasets,=readi4(fobj)
+            now_position=4+1
             for i in range(self._number_of_datasets):
                 dset=Dataset.from_file_positioned(fobj,order=order)
                 self._dataset_names.append(dset._name)
-                self._datasets[dset._name]=dset._value
+                self._dataset_info[dset._name]={
+                    'position':now_position,
+                    'size':dset.size,
+                    'value':dset._value,
+                    'description':dset.description,
+                }
+                now_position+=DATASET_NAME_LENGTH+DATASET_DESCRIPTION_LENGTH*4
+                now_position+=dset.size
 
     def __getattr__(self,a):
-        return self._datasets[a]
+        return self._dataset_info[a]['value']
     def __getitem__(self,a):
-        return self._datasets[a]
+        return self._dataset_info[a]['value']
+
     def __iadd__(self,d):
         if isinstance(d,dict):
             if self._number_of_datasets==0:
@@ -118,13 +128,37 @@ class File:
                 with self._file.open('r+b') as fobj:
                     writei4(fobj,self._number_of_datasets)
             for name,value in d.items():
-                datset=Dataset(name=name,description=Description.from_value(value),value=array(value).T)
+                _value=array(value)
+                _description=Description.from_value(value)
+                dset=Dataset(name=name,description=_description,value=_value.T)
                 self._dataset_names.append(name)
-                self._datasets[name]=array(value)
                 with self._file.open('ab') as fobj:
-                    fobj.write(datset.as_bytes())
+                    now_position=fobj.tell()
+                    fobj.write(dset.as_bytes())
+                self._dataset_info[name]={
+                    'position':now_position,
+                    'size':dset.size,
+                    'value':_value,
+                    'description':_description,
+                }
 
         return self
+
+    def to_file(self,file=None):
+        _file=Path(file) if file else self._file
+        with _file.open('wb') as fobj:
+            writei4(fobj,self._number_of_datasets)
+            for name,item in self._dataset_info.items():
+                dset=Dataset(name=name,description=item['description'],value=item['value'],order='F')
+                fobj.write(dset.as_bytes())
+
+    def __isub__(self,name):
+        self._number_of_datasets-=1
+        del self._dataset_info[name]
+        self._dataset_names.remove(name)
+        self.to_file()
+        return self
+
 class Dataset:
     def __init__(self,name=None,description=None,value=None,order='F'):
         self._name=name.strip()
@@ -176,6 +210,22 @@ class Dataset:
         ret+=self.value_as_bytes()
         return ret
 
+    @property
+    def size(self):
+        from math import prod
+        s={1:4,2:4,3:8,4:8,5:self._description[1]}[self._description[0]]
+        if self._description[2]:
+            s*=prod(self.shape)
+        return s
+
+    @property
+    def shape(self):
+        _dimension=self._description[2]
+        return self._description[3:3+_dimension]
+
+    @property
+    def description(self):
+        return Description.from_description(self._description)
 
 class Description:
     def __init__(self,description=None):
@@ -211,6 +261,12 @@ class Description:
             print(f'not sure how to deal with data of type {type(value)}')
         obj=cls(description)
         return obj
+
+    @classmethod
+    def from_description(cls,desc):
+        if isinstance(desc,Description): obj=desc
+        else: obj=cls(description=desc)
+        return obj
     def __call__(self):
         return self._description
     def __getitem__(self,i):
@@ -219,5 +275,3 @@ class Description:
     def shape(self):
         _dimension=self._description[2]
         return self._description[3:3+_dimension]
-
-

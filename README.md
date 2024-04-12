@@ -82,6 +82,20 @@ If a database file already exists, you can load the database with
 base=from_file('file.bin')
 ```
 
+### Remove dataset
+
+A dataset can be removed by name or number (by the order in which it was added to the database).
+
+`call base%remove('dataset,name')`
+
+or
+
+`call base%remove(1)`
+
+### Delete database
+
+`call base%delete`
+
 ## Python interface
 
 The fortdb.py file provides a Python interface with the database files of the same format, with both reading a writing capability. 
