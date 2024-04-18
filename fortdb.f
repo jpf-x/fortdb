@@ -64,6 +64,14 @@ module fortDB
 
     end type dataset
 
+    interface list_contains
+        procedure :: list_contains_i4
+        procedure :: list_contains_i8
+        procedure :: list_contains_r4
+        procedure :: list_contains_r8
+        procedure :: list_contains_str
+    end interface list_contains
+
     interface dataset_from_data
         procedure :: dataset_from_data_0d
         procedure :: dataset_from_data_1d
@@ -126,10 +134,11 @@ module fortDB
      &                           add_dataset_from_data_6d, &
      &                           add_dataset_from_data_7d, &
      &                           add_dataset_at_position
-
+        procedure,public :: contains => database_contains
         procedure,private :: remove_dataset_by_number
         procedure,private :: remove_dataset_by_name
-        generic,public :: remove => remove_dataset_by_name,remove_dataset_by_number
+        procedure,private :: remove_datasets_by_name
+        generic,public :: remove => remove_dataset_by_name,remove_dataset_by_number,remove_datasets_by_name
         procedure,private :: get_dataset_information
         procedure,public :: get_size => get_size_database
         procedure,private :: initialize_database
@@ -425,6 +434,22 @@ contains
 
     end subroutine add_dataset_at_position
 
+    function database_contains(me,dset_name) result (res)
+        implicit none
+        class(database) :: me
+        character(len=*) :: dset_name
+        logical :: res
+        integer :: i
+        res=.false.
+        do i=1,me%number_of_datasets
+            if (trim(adjustl(dset_name)).eq.trim(adjustl(me%dataset_names(i)))) then
+                res=.true.
+                exit
+            endif
+        enddo
+
+    end function database_contains
+
     subroutine remove_dataset_by_name(me,dset_name)
         implicit none
         class(database) :: me
@@ -475,6 +500,71 @@ contains
         endif
 
     end subroutine remove_dataset_by_name
+
+    subroutine remove_datasets_by_name(me,dset_names)
+        implicit none
+        class(database) :: me
+        type(dataset) :: datset ! for temporary storage of moved dataset
+        character(len=DATASET_NAME_LENGTH) :: dset_names(:)
+        character(len=DATASET_NAME_LENGTH) :: dset_name
+
+        logical :: ifound
+        integer :: i
+        integer :: posir
+        integer :: posit
+        byte,allocatable :: alldata(:)
+        integer*8 :: total_size
+        integer :: filehandle
+        integer*8 :: now_position
+        integer :: number_of_datasets
+
+        filehandle=this%new()
+        open(unit=filehandle,status='replace',access='stream',form='unformatted',action='readwrite')
+        now_position=WORD_SIZE+1
+        total_size=WORD_SIZE
+        number_of_datasets=0
+        do i=1,me%number_of_datasets
+            if (list_contains(dset_names,me%dataset_names(i))) then
+                cycle
+            endif
+            number_of_datasets=number_of_datasets+1
+            posit=me%dataset_positions(i)
+            datset=me%get_dataset_from_position(posit)
+            write(filehandle,pos=now_position) datset%name
+            now_position=now_position+DATASET_NAME_LENGTH
+            write(filehandle) datset%description
+            now_position=now_position+DATASET_DESCRIPTION_LENGTH*WORD_SIZE
+            select case (datset%description(1))
+                case (1)
+                    write(filehandle,pos=now_position)datset%datas_i4
+                case (2)
+                    write(filehandle,pos=now_position)datset%datas_r4
+                case (3)
+                    write(filehandle,pos=now_position)datset%datas_i8
+                case (4)
+                    write(filehandle,pos=now_position)datset%datas_r8
+                case (5)
+                    write(filehandle,pos=now_position)datset%datas_c
+            end select
+            total_size=total_size+DATASET_NAME_LENGTH+DATASET_DESCRIPTION_LENGTH*WORD_SIZE+datset%get_size()
+            now_position=now_position+datset%get_size()
+            me%dataset_positions(number_of_datasets)=me%dataset_positions(i)
+            me%dataset_names(number_of_datasets)=me%dataset_names(i)
+            me%dataset_descriptions(:,number_of_datasets)=me%dataset_descriptions(:,i)
+            me%dataset_sizes(number_of_datasets)=me%dataset_sizes(i)
+        enddo
+        write(filehandle,pos=1)number_of_datasets
+        allocate(alldata(total_size))
+        read(filehandle,pos=1)alldata
+        close(filehandle,status='delete')
+        me%number_of_datasets=number_of_datasets        
+        call me%allocator
+        open(unit=me%handle,file=me%filename,form='unformatted',access='stream',status='replace',action='write')
+        write(me%handle,pos=1)alldata
+        deallocate(alldata)
+        close(me%handle)
+        this%most_recent=this%most_recent-1 ! give the file handle back
+    end subroutine remove_datasets_by_name
 
     subroutine remove_dataset_by_number(me,i)
         implicit none
@@ -1156,7 +1246,80 @@ contains
         enddo
     end function get_size_dataset
 
+    function list_contains_i4(list,item) result (icontain)
+        implicit none
+        integer*4 :: list(:)
+        integer*4 :: item
+        logical :: icontain
+        integer :: i
+        icontain=.false.
+        do i=1,size(list)
+            if (item.eq.list(i)) then
+                icontain=.true.
+                exit
+            endif
+        enddo
+    end function list_contains_i4
 
+    function list_contains_i8(list,item) result (icontain)
+        implicit none
+        integer*8 :: list(:)
+        integer*8 :: item
+        logical :: icontain
+        integer :: i
+        icontain=.false.
+        do i=1,size(list)
+            if (item.eq.list(i)) then
+                icontain=.true.
+                exit
+            endif
+        enddo
+    end function list_contains_i8
+
+    function list_contains_r4(list,item) result (icontain)
+        implicit none
+        real*4 :: list(:)
+        real*4 :: item
+        logical :: icontain
+        integer :: i
+        icontain=.false.
+        do i=1,size(list)
+            if (item.eq.list(i)) then
+                icontain=.true.
+                exit
+            endif
+        enddo
+    end function list_contains_r4
+
+    function list_contains_r8(list,item) result (icontain)
+        implicit none
+        real*8 :: list(:)
+        real*8 :: item
+        logical :: icontain
+        integer :: i
+        icontain=.false.
+        do i=1,size(list)
+            if (item.eq.list(i)) then
+                icontain=.true.
+                exit
+            endif
+        enddo
+    end function list_contains_r8
+
+    function list_contains_str(list,item) result (icontain)
+        implicit none
+        character(len=*) :: list(:)
+        character(len=*) :: item
+        logical :: icontain
+        integer :: i
+        icontain=.false.
+        do i=1,size(list)
+            if (trim(adjustl(item)).eq.trim(adjustl(list(i)))) then
+                icontain=.true.
+                exit
+            endif
+        enddo
+    end function list_contains_str
 
 end module fortDB
 
