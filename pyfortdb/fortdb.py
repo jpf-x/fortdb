@@ -88,6 +88,7 @@ class File:
         self._mode=mode
         self._init_database(order=order)
         self._order=order
+        self._name=file
 
     @property
     def datasets(self):
@@ -159,6 +160,10 @@ class File:
         self.to_file()
         return self
 
+    @property
+    def name(self):
+        return self._name
+
 class Dataset:
     def __init__(self,name=None,description=None,value=None,order='F'):
         self._name=name.strip()
@@ -226,6 +231,10 @@ class Dataset:
     @property
     def description(self):
         return Description.from_description(self._description)
+
+    @property
+    def name(self):
+        return self._name
 
 class Description:
     def __init__(self,description=None):
