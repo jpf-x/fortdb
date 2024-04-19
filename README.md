@@ -3,10 +3,11 @@ Fortran Database binary format, with Python interface.
 
 
 ## Compile options
-    | Compiler |  Options |
-    | -------- |  ------- |
-    | gfortran | `-ffree-form -free` |  
-    | intel | `/free` |  
+
+| Compiler |  Options |
+| --- | --- |
+| gfortran | `-ffree-form -free` |
+| intel | `/free` |
   
 
 ## How to use
