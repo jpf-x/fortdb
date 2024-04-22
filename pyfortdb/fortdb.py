@@ -160,6 +160,17 @@ class File:
         self.to_file()
         return self
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self ,itype, value, traceback):
+        return
+
+    def __iter__(self):
+        for info in self._dataset_info.items():
+            yield Dataset(name=dataset_name,description=info['description'],value=info['value'])
+
+
     @property
     def name(self):
         return self._name
