@@ -143,7 +143,8 @@ module fortDB
         procedure,public :: get_size => get_size_database
         procedure,private :: initialize_database
         procedure,private :: initialize_database_with_filename
-        generic,public :: initialize => initialize_database,initialize_database_with_filename
+        procedure,private :: initialize_database_with_filename_and_unitnumber
+        generic,public :: initialize => initialize_database,initialize_database_with_filename,initialize_database_with_filename_and_unitnumber
         procedure,private :: allocator => allocator_database
         procedure,private :: update_number_of_datasets
         procedure,public :: close => close_database
@@ -201,6 +202,16 @@ contains
         me%handle=this%new()
         me%filename=filename
     end subroutine initialize_database_with_filename
+
+    subroutine initialize_database_with_filename_and_unitnumber(me,filename,unitnumber)
+        implicit none
+        class(database) :: me
+        character(len=*) :: filename
+        integer :: unitnumber
+        me%number_of_datasets=0
+        me%handle=unitnumber
+        me%filename=filename
+    end subroutine initialize_database_with_filename_and_unitnumber
 
     subroutine close_database(me)
         implicit none

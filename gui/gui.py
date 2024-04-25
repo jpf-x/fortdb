@@ -9,8 +9,9 @@ import sys
 sys.path.insert(0,Path(__file__).absolute().parent.parent.as_posix())
 
 class DatasetViewer():
-    def __init__(self, root):
+    def __init__(self, root,file=''):
         self.root = root
+        self._file=file
         self.root.title("Dataset Viewer")
 
         self.datasets = {}
@@ -19,6 +20,8 @@ class DatasetViewer():
 
         self.create_menu()
         self.create_widgets()
+        if self._file:
+            self.open_file(self._file)
 
     def create_menu(self):
         self.menu_bar = tk.Menu(self.root)
@@ -30,9 +33,12 @@ class DatasetViewer():
         self.file_menu.add_command(label="Exit", command=self.destroy)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
-    def open_file(self):
+    def open_file(self,file=''):
         from pyfortdb import fortdb
-        file_path = Path(filedialog.askopenfilename(filetypes=[("BIN Files", "*.bin")]))
+        if not file:
+            file_path = Path(filedialog.askopenfilename(filetypes=[("BIN Files", "*.bin")]))
+        else:
+            file_path=Path(file)
         if file_path:
             self._data_type='bin'
             with fortdb.File(file_path) as file:
@@ -58,7 +64,12 @@ class DatasetViewer():
         self.dataset_listbox.bind("<<ListboxSelect>>", self.on_dataset_select)
 
         self.data_table = ttk.Treeview(self.root)
+        self.vsb=ttk.Scrollbar(self.root,orient='vertical',command=self.data_table.yview)
+        self.hsb=ttk.Scrollbar(self.data_table,orient='horizontal',command=self.data_table.xview)
         self.data_table.pack(side="left", fill="both", expand=True)
+        self.vsb.place(relx=1,rely=0,relheight=1,anchor='ne')
+        self.hsb.place(relx=0,rely=1,relwidth=1,anchor='sw')
+        self.data_table.configure(yscrollcommand=self.vsb.set,xscrollcommand=self.hsb.set)
 
     def on_dataset_select(self, event):
         selected_index = self.dataset_listbox.curselection()
@@ -87,8 +98,7 @@ class DatasetViewer():
         i=0
 
         try:
-            while True:
-                row=[next(values) for j in range(length_row)]
+            while (row:=[next(values) for j in range(length_row)]):
 
                 if i==0:
                     if shape[0]>0:
@@ -113,17 +123,26 @@ class DatasetViewer():
                 else:
                     ix=unravel_index(i,shape)
                     header=','.join(['(*']+[f'{ix[j+1]}' for j in range(len(shape)-1)])+')'
-                self.data_table.insert("", "end", text=header, values=row)
+                if (i+1)%2:
+                    self.data_table.insert("", "end", text=header, values=row, tag='gray')
+                else:
+                    self.data_table.insert("", "end", text=header, values=row, tag='offwhite')
                 i+=1
                 if (i+2)%length_row==0: nrow+=1
                         
         except StopIteration:
             pass
+        self.data_table.tag_configure('gray', background='#edeffe')
+        self.data_table.tag_configure('offwhite', background='#efefdf')
         for j in range(len(header)):
             self.data_table.column(j)
 
 
 if __name__ == "__main__":
+    import argparse
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--file',type=str,help='optional file',default='')
+    args=parser.parse_args()
     root = tk.Tk()
-    app = DatasetViewer(root)
+    app = DatasetViewer(root,file=args.file)
     root.mainloop()
