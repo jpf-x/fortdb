@@ -2,7 +2,7 @@ module fortDB
 !
 ! Fortran Database (binary) file definition allows easy reading and writing of datasets.
 !
-!  Must initialize file handler with
+!  Initialize automatic file handler with
 !
 !    call init_fortdb
 !

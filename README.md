@@ -14,7 +14,7 @@ Fortran Database binary format, with Python interface.
 
 ### Initializing
 
-In your Fortran program, you must first call the file handler by typing
+In your Fortran program, if you want to use the automated file handler (so that you don't have to supply your own file unit numbers) you must first initialize the file handler by typing
 
 ```
 use fortdb
@@ -30,15 +30,26 @@ To open a database (existing or not), declare a database object and initialize:
 ```
 type(database) :: base
 
-base%initialize('filename.bin')
+call base%initialize('filename.bin')
 ```
+
+Alternatively, if you wish to specify your own file unit numbers, use
+
+```
+type(database) :: base
+
+call base%initialize('filename.bin',11)
+```
+
+(for unit number 11, for example)
+
 
 ### Adding a dataset
 
 Then, to add a dataset to a database, simply type
 
 ```
-base%add('dataset,name', data_array)
+call base%add('dataset,name', data_array)
 ```
 where data_array is any type of data currently supported, including up to 7 dimensional arrays of integer(4), real(4), integer(8), real(8), character(len=*). When a character array is used, the length of character elements is set to the longest character element.
 
@@ -92,6 +103,16 @@ A dataset can be removed by name or number (by the order in which it was added t
 or
 
 `call base%remove(1)`
+
+You can also remove a list of datasets, as
+
+`call base%remove(list_of_datasets)`
+
+where `list_of_datasets` may be
+
+`list_of_datasets=(/'dataset1','dataset2','dataset3'/)`
+
+for example.
 
 ### Delete database
 
