@@ -1,5 +1,5 @@
 # fortdb
-Fortran Database binary format, with Python interface.
+Fortran Database binary format, with Python interface, and GUI.
 
 
 ## Compile options
@@ -135,6 +135,13 @@ To use fortdb.py is much simpler, of course:
   file-='dataset,name'  # removes dataset 'dataset,name' from file
 
 ```
+
+
+## GUI
+
+Just open gui/gui.py and it's self-explanatory.
+
+It's an absolutely bare bones viewer of the database files. Currently no write capability through the GUI.
 
 ## Rules on dataset names
 
