@@ -26,7 +26,8 @@ module fortDB
 !               2 real*4
 !               3 integer*8
 !               4 real*8
-!               5 character
+!               5 character(len=*)
+!               6 logical*4
 !               
 !   2           if index 1 is character, length of character
 !   3           array dimension, 0 if scalar
@@ -38,7 +39,6 @@ module fortDB
 !  10           if index 3 is non-zero, length of dimension 7
 !       
 
-    integer,parameter :: kind4=4
     integer,parameter :: WORD_SIZE=4
     integer,parameter :: DIMENSIONS=7   ! in order to change (increase) this, _1d, _2d, etc functions must be replicated as appropriate to beyond _7d
     integer,parameter :: DATASET_DESCRIPTION_LENGTH=3+DIMENSIONS
@@ -55,6 +55,7 @@ module fortDB
         real(kind=4),allocatable :: datas_r4(:)
         real(kind=8),allocatable :: datas_r8(:)
         character(len=:),allocatable :: datas_c(:)
+        logical(kind=4),allocatable :: datas_b(:)
 
       contains
 
@@ -307,6 +308,8 @@ contains
                 ws=8
             case (5)
                 ws=description(2)
+            case (6)
+                ws=4
         end select
         total_size=ws
         do i=1,description(3)
@@ -384,6 +387,8 @@ contains
                 allocate(me%datas_r8(length))
             case (5)
                 allocate(character(me%description(2)) :: me%datas_c(length))
+            case (6)
+                allocate(me%datas_b(length))
         end select
     end subroutine allocator_dataset
 
@@ -439,6 +444,8 @@ contains
                 write(me%handle,pos=now_position)datset%datas_r8
             case (5)
                 write(me%handle,pos=now_position)datset%datas_c
+            case (6)
+                write(me%handle,pos=now_position)datset%datas_b
         end select
 
         close(me%handle)
@@ -556,6 +563,8 @@ contains
                     write(filehandle,pos=now_position)datset%datas_r8
                 case (5)
                     write(filehandle,pos=now_position)datset%datas_c
+                case (6)
+                    write(filehandle,pos=now_position)datset%datas_b
             end select
             total_size=total_size+DATASET_NAME_LENGTH+DATASET_DESCRIPTION_LENGTH*WORD_SIZE+datset%get_size()
             now_position=now_position+datset%get_size()
@@ -655,6 +664,8 @@ contains
                 read(me%handle,pos=now_position) dset%datas_r8
             case (5)
                 read(me%handle,pos=now_position) dset%datas_c
+            case (6)
+                read(me%handle,pos=now_position) dset%datas_b
         end select
         close(me%handle)
     end function get_dataset_from_position
@@ -804,6 +815,9 @@ contains
             type is (character(len=*))
                 allocate(character(dset%description(2)) :: dset%datas_c(length))
                 dset%datas_c=dat
+            type is (logical(kind=4))
+                allocate(dset%datas_b(length))
+                dset%datas_b=dat
         end select
     end subroutine set_to_1d_0d
 
@@ -827,6 +841,9 @@ contains
             type is (character(len=*))
                 allocate(character(dset%description(2)) :: dset%datas_c(length))
                 dset%datas_c=dat
+            type is (logical(kind=4))
+                allocate(dset%datas_b(length))
+                dset%datas_b=dat
         end select
     end subroutine set_to_1d_nd
 
@@ -928,6 +945,8 @@ contains
                 s=1
             case (5)
                 s=1
+            case (6)
+                s=1
         end select
 
         do i=1,description(3)
@@ -953,6 +972,8 @@ contains
             type is (character(len=*))
                 description(1)=5
                 description(2)=len(dat)
+            type is (logical(kind=4))
+                description(1)=6
         end select
     end function get_dataset_description_from_data_0d
 
@@ -977,6 +998,8 @@ contains
                 do i=2,size(dat)
                     description(2)=max(description(2),len(dat(i)))
                 enddo
+            type is (logical(kind=4))
+                description(1)=6
         end select
         description(3)=size(shape(dat))
         if (description(3).gt.0) then
@@ -1009,6 +1032,8 @@ contains
                     description(2)=max(description(2),len(dat(i,j)))
                 enddo
                 enddo
+            type is (logical(kind=4))
+                description(1)=6
         end select
         description(3)=size(shape(dat))
         if (description(3).gt.0) then
@@ -1044,6 +1069,8 @@ contains
                 enddo
                 enddo
                 enddo
+            type is (logical(kind=4))
+                description(1)=6
         end select
         description(3)=size(shape(dat))
         if (description(3).gt.0) then
@@ -1081,6 +1108,8 @@ contains
                 enddo
                 enddo
                 enddo
+            type is (logical(kind=4))
+                description(1)=6
         end select
         description(3)=size(shape(dat))
         if (description(3).gt.0) then
@@ -1120,6 +1149,8 @@ contains
                 enddo
                 enddo
                 enddo
+            type is (logical(kind=4))
+                description(1)=6
         end select
         description(3)=size(shape(dat))
         if (description(3).gt.0) then
@@ -1161,6 +1192,8 @@ contains
                 enddo
                 enddo
                 enddo
+            type is (logical(kind=4))
+                description(1)=6
         end select
         description(3)=size(shape(dat))
         if (description(3).gt.0) then
@@ -1204,6 +1237,8 @@ contains
                 enddo
                 enddo
                 enddo
+            type is (logical(kind=4))
+                description(1)=6
         end select
         description(3)=size(shape(dat))
         if (description(3).gt.0) then
@@ -1250,6 +1285,8 @@ contains
                 word_size=8
             case (5)
                 word_size=me%description(2)
+            case (6)
+                word_size=4
         end select
         total_size=word_size
         do i=1,me%description(3)

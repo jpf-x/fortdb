@@ -26,6 +26,9 @@ def readr8(obj,n=1):
 def readstr(obj,n=1):
     return obj.read(n).decode('ascii')
 
+def readb(obj,n=1):
+    return struct.unpack('{0}i'.format(n),obj.read(4*n))
+
 def writei4(obj,*v):
     obj.write(asbytes_i4(*v))
 
@@ -40,6 +43,9 @@ def writer8(obj,*v):
 
 def writestr(obj,*v):
     obj.write(asbytes_str(v))
+
+def writeb(obj,*v):
+    obj.write(asbytes_b(*v))
 
 def asbytes_i4(*v):
     return struct.pack('{0}i'.format(len(v)),*v)
@@ -56,12 +62,16 @@ def asbytes_r8(*v):
 def asbytes_str(*v):
     return b''.join([vv.encode('ascii') for vv in v])
 
+def asbytes_b(*v):
+    return struct.pack('{0}i'.format(len(v)),*v)
+
 READER={
     1:readi4,
     2:readr4,
     3:readi8,
     4:readr8,
     5:readstr,
+    6:readb,
 }
 
 WRITER={
@@ -70,6 +80,7 @@ WRITER={
     3:writei8,
     4:writer8,
     5:writestr,
+    6:writeb,
 }
 
 ASBYTES={
@@ -78,6 +89,7 @@ ASBYTES={
     3:asbytes_i8,
     4:asbytes_r8,
     5:asbytes_str,
+    6:asbytes_b,
 }
 
 class File:
@@ -229,7 +241,7 @@ class Dataset:
     @property
     def size(self):
         from math import prod
-        s={1:4,2:4,3:8,4:8,5:self._description[1]}[self._description[0]]
+        s={1:4,2:4,3:8,4:8,5:self._description[1],6:4}[self._description[0]]
         if self._description[2]:
             s*=prod(self.shape)
         return s
